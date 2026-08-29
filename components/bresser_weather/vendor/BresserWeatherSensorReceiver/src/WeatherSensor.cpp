@@ -126,9 +126,19 @@
 
 #include "WeatherSensorCfg.h"
 #include "WeatherSensor.h"
+#if defined(BRESSER_ESPHOME_IDF)
+#include "BresserEspHal.h"
+#include "esp_timer.h"
+#endif
 
 namespace WeatherSensorReceiver
 {
+#if defined(BRESSER_ESPHOME_IDF)
+    BresserEspHal hal(LORA_SCK, LORA_MISO, LORA_MOSI,
+                      BRESSER_SPI_HOST, BRESSER_SPI_CLOCK);
+    RADIO_CHIP radio = new Module(&hal, PIN_RECEIVER_CS, PIN_RECEIVER_IRQ,
+                                  PIN_RECEIVER_RST, PIN_RECEIVER_GPIO);
+#else
 #if defined(ARDUINO_LILYGO_T3S3_SX1262) || defined(ARDUINO_LILYGO_T3S3_SX1276) || defined(ARDUINO_LILYGO_T3S3_LR1121) || \
     defined(HELTEC_WIRELESS_STICK_LITE_V3)
     // Use a statically allocated SPIClass with the integer bus-number constructor instead of
@@ -153,6 +163,7 @@ namespace WeatherSensorReceiver
     RADIO_CHIP radio = new Module(PIN_RECEIVER_CS, PIN_RECEIVER_IRQ, PIN_RECEIVER_RST, PIN_RECEIVER_GPIO, spi);
 #else
     RADIO_CHIP radio = new Module(PIN_RECEIVER_CS, PIN_RECEIVER_IRQ, PIN_RECEIVER_RST, PIN_RECEIVER_GPIO);
+#endif
 #endif
 
 #if defined(ARDUINO_LILYGO_T3S3_LR1121)
@@ -202,7 +213,7 @@ static volatile bool receivedFlag = false;
 
 // This function is called when a complete packet is received by the module
 // IMPORTANT: This function MUST be 'void' type and MUST NOT have any arguments!
-#if defined(ESP8266) || defined(ESP32)
+#if defined(ESP8266) || defined(ESP32) || defined(BRESSER_ESPHOME_IDF)
 IRAM_ATTR
 #endif
 void setFlag(void)
@@ -302,6 +313,14 @@ int16_t WeatherSensor::begin(uint8_t max_sensors_default, bool init_filters, dou
     radio.setTCXO(1.8);
 #endif
 
+#if defined(BRESSER_TCXO_VOLTAGE) && (defined(USE_SX1262) || defined(USE_LR1121))
+    radio.setTCXO(BRESSER_TCXO_VOLTAGE);
+#endif
+
+#if defined(BRESSER_DIO2_AS_RF_SWITCH) && defined(USE_SX1262)
+    radio.setDio2AsRfSwitch(true);
+#endif
+
     if (state == RADIOLIB_ERR_NONE)
     {
         log_d("success!");
@@ -376,14 +395,22 @@ void WeatherSensor::sleep(void)
 
 bool WeatherSensor::getData(uint32_t timeout, uint8_t flags, uint8_t type, void (*func)())
 {
+#if defined(BRESSER_ESPHOME_IDF)
+    const uint32_t timestamp = static_cast<uint32_t>(esp_timer_get_time() / 1000ULL);
+#else
     const uint32_t timestamp = millis();
+#endif
 
 #if defined(ARDUINO_HELTEC_WIFI_LORA_32_V4)
     femEnable();
 #endif
     radio.startReceive();
 
+#if defined(BRESSER_ESPHOME_IDF)
+    while ((static_cast<uint32_t>(esp_timer_get_time() / 1000ULL) - timestamp) < timeout)
+#else
     while ((millis() - timestamp) < timeout)
+#endif
     {
         int decode_status = getMessage();
 

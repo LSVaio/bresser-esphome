@@ -1,12 +1,17 @@
+#if !defined(BRESSER_ESPHOME_IDF)
 #include <Arduino.h>
+#else
+#include <cstdint>
+#include <cstdio>
+#endif
 #include <math.h>
-#if defined(ESP32) || defined(ESP8266)
+#if defined(ESP32) || defined(ESP8266) || defined(BRESSER_ESPHOME_IDF)
   #include <string>
 #endif
 #include <string.h>
 #include "WeatherUtils.h"
 
-#if defined(ESP32) || defined(ESP8266)
+#if defined(ESP32) || defined(ESP8266) || defined(BRESSER_ESPHOME_IDF)
 // Mapping of wind direction in degrees to text
 // Note: add your localization as desired
 const std::string COMPASS_POINTS[17] = {

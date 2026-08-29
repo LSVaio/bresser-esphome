@@ -1,0 +1,48 @@
+substitutions:
+  framework: esp-idf
+  radio_type: sx1276
+
+esphome:
+  name: bresser-ci
+
+esp32:
+  variant: esp32
+  framework:
+    type: ${framework}
+
+external_components:
+  - source:
+      type: local
+      path: ../../components
+    components: [bresser_weather]
+
+logger:
+
+api:
+
+wifi:
+  ssid: ci-network
+  password: ci-password
+
+esp32_ble_tracker:
+
+bluetooth_proxy:
+  active: true
+
+bresser_weather:
+  radio_type: ${radio_type}
+  tcxo_voltage: 1.8
+  dio2_as_rf_switch: true
+  pins:
+    sck: 5
+    miso: 19
+    mosi: 27
+    cs: 18
+    reset: 14
+    irq: 26
+    gpio: 33
+  log_sensor_id: true
+  temperature:
+    name: Temperature
+  sensor_id:
+    name: Sensor ID

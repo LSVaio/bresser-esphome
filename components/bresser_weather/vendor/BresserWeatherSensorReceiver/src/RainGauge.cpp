@@ -68,6 +68,8 @@
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
+#if !defined(BRESSER_ESPHOME_IDF)
+
 #include <Arduino.h>
 #include "WeatherSensorCfg.h"
 #include "RainGauge.h"
@@ -499,3 +501,5 @@ RainGauge::currentMonth(void)
     
     return rainCurr - nvData.rainMonthBegin;
 }
+
+#endif

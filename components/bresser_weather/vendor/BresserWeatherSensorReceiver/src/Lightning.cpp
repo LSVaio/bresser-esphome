@@ -75,6 +75,8 @@
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
+#if !defined(BRESSER_ESPHOME_IDF)
+
 #include <Arduino.h>
 #include "Lightning.h"
 
@@ -322,3 +324,5 @@ Lightning::pastHour(bool *valid, int *nbins, float *quality)
     };
     return static_cast<int>(sumHistory(hourHist, valid, nbins, quality, 1.0));
 }
+
+#endif

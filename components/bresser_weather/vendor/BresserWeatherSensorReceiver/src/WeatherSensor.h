@@ -98,10 +98,16 @@
 #ifndef WeatherSensor_h
 #define WeatherSensor_h
 
+#include <algorithm>
+#if defined(BRESSER_ESPHOME_IDF)
+#include <cstdint>
+#include <cstring>
+#else
 #include <Arduino.h>
+#include <Preferences.h>
+#endif
 #include <vector>
 #include <string>
-#include <Preferences.h>
 #include <RadioLib.h>
 #include "WeatherSensorCfg.h"
 
@@ -176,7 +182,11 @@ typedef enum DecodeStatus {
  */
 typedef struct SensorMap {
     uint32_t        id;    //!< ID of sensor (as transmitted in radio message)
+#if defined(BRESSER_ESPHOME_IDF)
+    std::string     name;  //!< Name of sensor (e.g. for MQTT topic)
+#else
     String          name;  //!< Name of sensor (e.g. for MQTT topic)
+#endif
 } SensorMap;
 
 
@@ -188,7 +198,9 @@ typedef struct SensorMap {
 */
 class WeatherSensor {
     private:
+#if !defined(BRESSER_ESPHOME_IDF)
         Preferences cfgPrefs; //!< Preferences (stored in flash memory)
+#endif
         std::vector<uint32_t> sensor_ids_inc;
         std::vector<uint32_t> sensor_ids_exc;
 
@@ -467,6 +479,7 @@ class WeatherSensor {
          * 
          * \returns size in bytes
          */
+#if !defined(BRESSER_ESPHOME_IDF)
         uint8_t convSensorsJson(std::vector<uint32_t> &ids, String json, uint8_t *buf);
 
         /*!
@@ -505,6 +518,7 @@ class WeatherSensor {
          * \returns JSON string
          */
         String getSensorsExcJson(void);
+#endif
 
         /*!
          * Get maximum number of  sensors from Preferences
@@ -640,7 +654,7 @@ class WeatherSensor {
         */
         uint16_t crc16(uint8_t const message[], unsigned nBytes, uint16_t polynomial, uint16_t init);
 
-        #if CORE_DEBUG_LEVEL >= ARDUHAL_LOG_LEVEL_DEBUG
+        #if defined(BRESSER_ESPHOME_IDF) || CORE_DEBUG_LEVEL >= ARDUHAL_LOG_LEVEL_DEBUG
             /*!
              * \brief Log message payload
              *
@@ -658,7 +672,7 @@ class WeatherSensor {
                 int offs;
                 int len1 = strlen(txt);
                 int len2 = strlen(descr) + 2; // add colon and space
-                int prefix_len = max(len1, len2);
+                int prefix_len = std::max(len1, len2);
     
                 memset(buf, ' ', prefix_len);
                 buf[prefix_len] = '\0';

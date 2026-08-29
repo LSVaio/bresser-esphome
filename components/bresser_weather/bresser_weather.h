@@ -17,6 +17,7 @@ class BresserWeatherComponent : public Component {
   float get_setup_priority() const override { return setup_priority::DATA; }
 
   void set_frequency_offset(float offset) { frequency_offset_ = offset; }
+  void set_max_sensors(uint8_t value) { max_sensors_ = value; }
   void set_log_sensor_id(bool value) { log_sensor_id_ = value; }
   void set_filter_sensor_id(uint32_t id) {
     filter_sensor_id_ = id;
@@ -40,6 +41,7 @@ class BresserWeatherComponent : public Component {
 
   WeatherSensor receiver_;
   float frequency_offset_{0.0f};
+  uint8_t max_sensors_{4};
   uint32_t filter_sensor_id_{0};
   bool filter_enabled_{false};
   bool log_sensor_id_{true};

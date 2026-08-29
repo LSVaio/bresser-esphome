@@ -1,17 +1,37 @@
-name: Validate ESPHome configuration
+name: Build ESPHome firmware
 
 on:
   push:
   pull_request:
 
 jobs:
-  validate:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - framework: esp-idf
+            radio: cc1101
+          - framework: esp-idf
+            radio: sx1276
+          - framework: esp-idf
+            radio: sx1262
+          - framework: esp-idf
+            radio: lr1121
+          - framework: arduino
+            radio: sx1276
     runs-on: ubuntu-latest
+    name: ${{ matrix.framework }} / ${{ matrix.radio }}
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
+          cache: pip
       - run: pip install "esphome==2026.8.0"
-      - run: cp secrets.yaml.example secrets.yaml
-      - run: esphome config bresser-el-nino.yaml
+      - run: >-
+          esphome
+          -s framework ${{ matrix.framework }}
+          -s radio_type ${{ matrix.radio }}
+          compile .github/ci/compile.yaml

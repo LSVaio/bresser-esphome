@@ -49,9 +49,11 @@
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include <ArduinoJson.h>
 #include "WeatherSensorCfg.h"
 #include "WeatherSensor.h"
+
+#if !defined(BRESSER_ESPHOME_IDF)
+#include <ArduinoJson.h>
 
 // Initialize list of sensor IDs
 void WeatherSensor::initList(std::vector<uint32_t> &list, const std::vector<uint32_t> list_def, const char *key)
@@ -282,3 +284,86 @@ void WeatherSensor::getSensorsCfg(uint8_t &max_sensors, uint8_t &rx_flags, uint8
     en_decoders = cfgPrefs.getUChar("endec", 0xFF);
     cfgPrefs.end();
 }
+
+#else
+
+void WeatherSensor::initList(std::vector<uint32_t> &list,
+                             const std::vector<uint32_t> list_def,
+                             const char *key)
+{
+    (void)key;
+    list = list_def;
+}
+
+static void bresser_set_id_list(std::vector<uint32_t> &ids, const uint8_t *buf, uint8_t size)
+{
+    ids.clear();
+    if (buf == nullptr || size < 4) {
+        return;
+    }
+    if ((buf[0] | buf[1] | buf[2] | buf[3]) == 0) {
+        return;
+    }
+    for (size_t i = 0; i + 3 < size; i += 4) {
+        ids.push_back((static_cast<uint32_t>(buf[i]) << 24) |
+                      (static_cast<uint32_t>(buf[i + 1]) << 16) |
+                      (static_cast<uint32_t>(buf[i + 2]) << 8) |
+                      static_cast<uint32_t>(buf[i + 3]));
+    }
+}
+
+static uint8_t bresser_get_id_list(const std::vector<uint32_t> &ids, uint8_t *payload)
+{
+    if (payload == nullptr) {
+        return 0;
+    }
+    for (const uint32_t id : ids) {
+        for (int i = 3; i >= 0; i--) {
+            *payload++ = (id >> (i * 8)) & 0xFF;
+        }
+    }
+    return static_cast<uint8_t>(ids.size() * 4);
+}
+
+void WeatherSensor::setSensorsInc(uint8_t *buf, uint8_t size)
+{
+    bresser_set_id_list(sensor_ids_inc, buf, size);
+}
+
+void WeatherSensor::setSensorsExc(uint8_t *buf, uint8_t size)
+{
+    bresser_set_id_list(sensor_ids_exc, buf, size);
+}
+
+uint8_t WeatherSensor::getSensorsInc(uint8_t *payload)
+{
+    return bresser_get_id_list(sensor_ids_inc, payload);
+}
+
+uint8_t WeatherSensor::getSensorsExc(uint8_t *payload)
+{
+    return bresser_get_id_list(sensor_ids_exc, payload);
+}
+
+void WeatherSensor::setSensorsCfg(uint8_t max_sensors, uint8_t rx_flags, uint8_t en_decoders)
+{
+    rxFlags = rx_flags;
+    enDecoders = en_decoders;
+    sensor.resize(max_sensors);
+}
+
+void WeatherSensor::setRxCfg(uint8_t rx_flags, uint8_t en_decoders)
+{
+    rxFlags = rx_flags;
+    enDecoders = en_decoders;
+}
+
+void WeatherSensor::getSensorsCfg(uint8_t &max_sensors, uint8_t &rx_flags,
+                                  uint8_t &en_decoders)
+{
+    rx_flags = DATA_COMPLETE;
+    en_decoders = 0xFF;
+    (void)max_sensors;
+}
+
+#endif

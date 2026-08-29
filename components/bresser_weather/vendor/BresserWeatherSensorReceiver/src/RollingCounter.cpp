@@ -42,6 +42,8 @@
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
+#if !defined(BRESSER_ESPHOME_IDF)
+
 #include <Arduino.h>
 #include "WeatherSensorCfg.h"
 #include "RollingCounter.h"
@@ -210,3 +212,5 @@ RollingCounter::updateHistoryBuffer(int16_t* hist, size_t size, int idx, int16_t
         hist_init();
     }
 }
+
+#endif

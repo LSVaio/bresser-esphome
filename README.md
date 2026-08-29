@@ -1,29 +1,37 @@
-# Bresser El Nino 7-in-1 mit ESPHome
+# Bresser-Wettersensoren mit ESPHome
 
-Diese externe ESPHome-Komponente empfaengt die 868-MHz-Funktelegramme einer
-Bresser 7-in-1 El Nino direkt mit dem SX1276 eines LILYGO TTGO LoRa32. Die
-Messwerte werden ueber die native ESPHome-API in Home Assistant bereitgestellt;
-MQTT ist nicht erforderlich.
+Diese externe ESPHome-Komponente empfängt Bresser-Wettersensoren auf
+868,3 MHz und stellt deren Messwerte über die native ESPHome-API in Home
+Assistant bereit. Sie läuft wahlweise nativ mit ESP-IDF oder mit Arduino.
 
-Getestete Hardware:
+Unterstützte Funkchips:
 
-- LILYGO TTGO LoRa32 V1.2, klassischer ESP32, SX1276, 4 MB Flash
-- Bresser 7-in-1 El Nino auf 868,3 MHz
-- ESPHome 2026.8.0
+- CC1101
+- SX1276
+- SX1262
+- LR1121
 
-Bereitgestellt werden Temperatur, Luftfeuchtigkeit, Windgeschwindigkeit, Boe,
-Windrichtung, Regenzaehler, UV-Index, Beleuchtungsstaerke, Batteriealarm,
-Sensor-ID und Funk-RSSI.
+Der integrierte Decoder unterstützt die Bresser-Wetterprotokolle der
+3-in-1-, 5-in-1-, 6-in-1-, 7-in-1- und 8-in-1-Familien. In Home Assistant
+werden Temperatur, Luftfeuchtigkeit, Wind, Windrichtung, Regen, UV,
+Beleuchtungsstärke, Batteriestatus, Sensor-ID und RSSI bereitgestellt, sofern
+der jeweilige Außensensor diese Werte sendet.
 
-## Als GitHub-Library verwenden
+## Einbindung aus GitHub
 
 ```yaml
+esp32:
+  variant: esp32
+  framework:
+    type: esp-idf
+
 external_components:
-  - source: github://charlyschulte/bresser-esphome@v1.1.0
+  - source: github://charlyschulte/bresser-esphome@v1.2.0
     components: [bresser_weather]
     refresh: never
 
 bresser_weather:
+  radio_type: sx1276
   pins:
     sck: 5
     miso: 19
@@ -31,102 +39,103 @@ bresser_weather:
     cs: 18
     reset: 14
     irq: 26
-    dio1: 33
+    gpio: 33
   log_sensor_id: true
 
-  # Optional, nachdem die gewuenschte ID im Log gefunden wurde:
-  # filter_sensor_id: 0x00003717
-
   temperature:
-    name: Aussentemperatur
+    name: Außentemperatur
   humidity:
     name: Luftfeuchtigkeit
 ```
 
-Die vollstaendige Beispielkonfiguration mit allen Entitaeten befindet sich in
-`bresser-el-nino.yaml`.
+`framework.type` darf `esp-idf` oder `arduino` sein. Für einen Bluetooth-Proxy
+kann die ESP-IDF-Konfiguration zum Beispiel so ergänzt werden:
 
-## Sensor-ID zuerst anlernen und spaeter filtern
+```yaml
+esp32_ble_tracker:
 
-`filter_sensor_id` ist optional und in der Beispielkonfiguration zunaechst
-auskommentiert. Mit `log_sensor_id: true` meldet das Log bei jedem gueltigen
-Telegramm beispielsweise:
+bluetooth_proxy:
+  active: true
+```
+
+Die vollständige Konfiguration für ein LILYGO TTGO LoRa32 V1.x/V1.2 mit
+SX1276 befindet sich in [`bresser-el-nino.yaml`](bresser-el-nino.yaml).
+
+## Sensor-ID ermitteln und filtern
+
+`filter_sensor_id` ist optional. Solange kein Filter gesetzt ist, verarbeitet
+die Komponente jeden passenden Wettersensor. Mit `log_sensor_id: true` steht
+die ID jedes gültigen Telegramms im ESPHome-Log:
 
 ```text
 Empfangene Sensor-ID: 00003717
 ```
 
-Das USB-Log kann so gelesen werden:
-
-```bash
-esphome logs bresser-el-nino.yaml --device /dev/cu.usbserial-0202AE07
-```
-
-Wenn die richtige ID bekannt ist, wird sie unter `bresser_weather:` aktiviert:
+Anschließend kann genau dieser Sensor ausgewählt werden:
 
 ```yaml
+bresser_weather:
   filter_sensor_id: 0x00003717
+  log_sensor_id: false
 ```
 
-Danach kann `log_sensor_id` auf `false` gesetzt werden. Die diagnostische
-Home-Assistant-Entitaet `Sensor-ID` bleibt davon unberuehrt.
+Die diagnostische Home-Assistant-Entität `sensor_id` kann unabhängig davon
+aktiviert bleiben.
 
-## Funk-Pinbelegung
+## Radio und Pins
 
-Alle relevanten SX1276-Pins stehen sichtbar in der YAML. Fuer das getestete
-TTGO LoRa32 V1.x/V1.2 gelten:
+Die Pinbezeichnungen `irq` und `gpio` folgen den beiden Signalleitungen, die
+RadioLib für den gewählten Funkchip erwartet:
 
-| Funktion | GPIO |
-| --- | ---: |
-| SCK | 5 |
-| MISO | 19 |
-| MOSI | 27 |
-| CS/NSS | 18 |
-| Reset | 14 |
-| IRQ/DIO0 | 26 |
-| DIO1 | 33 |
+| `radio_type` | `irq` | `gpio` | `reset` |
+| --- | --- | --- | --- |
+| `cc1101` | GDO0 | GDO2 | optional |
+| `sx1276` | DIO0 | DIO1 | üblich |
+| `sx1262` | DIO1 | BUSY | üblich |
+| `lr1121` | DIO9/IRQ | BUSY | üblich |
 
-Die USB-Erkennung kann alte LoRa32-Revisionen nicht unterscheiden. Bei einer
-anderen Revision muessen der Boardwert und die Funk-Pins in der YAML angepasst
-werden. Vor dem Empfang muss eine passende 868-MHz-Antenne angeschlossen sein.
+Für ältere Konfigurationen bleibt `dio1` als Alias für `gpio` erhalten. Die
+SPI-Pins und alle Radio-Signale stehen bewusst in der YAML, damit beliebige
+ESP32-Boards und externe Funkmodule verwendet werden können.
 
-## Bauen und per USB installieren
+Weitere Optionen unter `bresser_weather`:
 
-Zuerst `secrets.yaml.example` als `secrets.yaml` kopieren und sichere Werte
-eintragen. Anschliessend:
+| Option | Standard | Bedeutung |
+| --- | --- | --- |
+| `radio_type` | `sx1276` | Verwendeter Funkchip |
+| `max_sensors` | `4` | Anzahl gleichzeitig verwalteter Sensoren, 1 bis 32 |
+| `frequency_offset` | `0.0` | Korrektur zur Basisfrequenz 868,3 MHz |
+| `spi_host` | `spi2` | ESP-IDF SPI-Host; `spi3` nur auf geeigneten ESP32-Varianten |
+| `spi_clock` | `2000000` | SPI-Takt in Hz |
+| `tcxo_voltage` | – | TCXO-Spannung für SX1262/LR1121 |
+| `dio2_as_rf_switch` | `false` | SX1262 DIO2 als internen RF-Schalter verwenden |
+| `filter_sensor_id` | – | Optionaler Filter als 32-Bit-ID |
+| `log_sensor_id` | `true` | Empfangene IDs protokollieren |
+
+Die korrekten Pins sowie TCXO- und RF-Schalter-Einstellungen müssen dem
+Schaltplan des verwendeten Boards oder Funkmoduls entnommen werden. Vor dem
+Empfang muss eine passende 868-MHz-Antenne angeschlossen sein.
+
+## Lokales Bauen und Installieren
+
+`secrets.yaml.example` als `secrets.yaml` kopieren und eigene Werte eintragen:
 
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install "esphome==2026.8.0"
-.venv/bin/esphome run bresser-el-nino.yaml \
-  --device /dev/cu.usbserial-0202AE07
+.venv/bin/esphome run bresser-el-nino.yaml --device /dev/cu.usbserial-XXXX
 ```
 
-Nach dem ersten Start erscheint nach etwa 15 Sekunden das WLAN
-`Bresser Wetter Setup`. Das Passwort steht als `fallback_ap_password` in
-`secrets.yaml`. Mit diesem WLAN verbinden, `http://192.168.4.1/` aufrufen und
-das eigene 2,4-GHz-WLAN auswaehlen. Alternativ kann WLAN per Improv ueber USB
-eingerichtet werden.
+Für das ESPHome-Add-on wird `bresser-el-nino.yaml` nach `/config/esphome/`
+kopiert und der lokale `external_components`-Block durch den oben gezeigten
+GitHub-Block ersetzt.
 
-Home Assistant findet das Geraet danach normalerweise automatisch unter
-**Einstellungen -> Geraete & Dienste**. Falls nicht, dort **Integration
-hinzufuegen -> ESPHome** waehlen und den Hostnamen oder die IP-Adresse eingeben.
-Den angeforderten Schluessel liefert `api_encryption_key` aus `secrets.yaml`.
+## Kompatibilität und Lizenzen
 
-## In das ESPHome-Add-on uebernehmen
-
-`bresser-el-nino.yaml` nach `/config/esphome/` kopieren und den lokalen
-`external_components`-Block durch den oben gezeigten GitHub-Block ersetzen.
-Ausserdem die drei Werte aus der lokalen `secrets.yaml` in
-`/config/esphome/secrets.yaml` uebernehmen. Danach kann das Geraet drahtlos per
-OTA aktualisiert werden.
-
-## Quellen und Lizenzen
-
-Die Komponente verwendet
+Die Build-Matrix prüft ESP-IDF und Arduino sowie alle vier Funkchips mit
+ESPHome 2026.8.0. Eingebunden sind
 [BresserWeatherSensorReceiver 0.41.1](https://github.com/matthias-bs/BresserWeatherSensorReceiver)
-und dessen feste
-[RadioLib-Abhaengigkeit 7.7.1](https://github.com/jgromes/RadioLib). Die
-Versionen sind fuer reproduzierbare Builds festgeschrieben. Der vendorte
-Bresser-Quellcode steht unter seiner mitgelieferten MIT-Lizenz; diese
-ESPHome-Komponente ebenfalls unter der MIT-Lizenz.
+und [RadioLib 7.7.1](https://github.com/jgromes/RadioLib). Beide Abhängigkeiten
+sind für reproduzierbare Builds festgeschrieben. Der native ESP-IDF-HAL basiert
+auf dem MIT-lizenzierten RadioLib-ESP-HAL; die Lizenzhinweise befinden sich in
+den jeweiligen Quelldateien.

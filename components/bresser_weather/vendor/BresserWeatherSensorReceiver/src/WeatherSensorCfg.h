@@ -81,7 +81,15 @@
 #if !defined(WEATHER_SENSOR_CFG_H)
 #define WEATHER_SENSOR_CFG_H
 
-#include <Arduino.h>
+#if defined(BRESSER_ESPHOME_IDF)
+    #include <cstddef>
+    #include <cstdint>
+    #include "esp_log.h"
+    #define LOW 0
+    #define HIGH 1
+#else
+    #include <Arduino.h>
+#endif
 
 // ------------------------------------------------------------------------------------------------
 // --- Weather Sensors ---
@@ -116,7 +124,7 @@
 // --- Rain Gauge / Lightning sensor data retention during deep sleep ---
 // ------------------------------------------------------------------------------------------------
 
-#if !defined(INSIDE_UNITTEST)
+#if !defined(INSIDE_UNITTEST) && !defined(BRESSER_ESPHOME_IDF)
     #if defined(ESP32)
         // Option: Comment out to save data in RTC RAM
         // N.B.:
@@ -211,7 +219,25 @@
 // This define is set by selecting "M5Core2" in the Arduino IDE
 //#define ARDUINO_M5STACK_CORE2
 
-#if defined(ARDUINO_TTGO_LoRa32_V1)
+#if defined(BRESSER_ESPHOME)
+    #pragma message("BRESSER_ESPHOME defined; using YAML radio configuration")
+    #if defined(BRESSER_RADIO_CC1101)
+        #define USE_CC1101
+    #elif defined(BRESSER_RADIO_SX1276)
+        #define USE_SX1276
+    #elif defined(BRESSER_RADIO_SX1262)
+        #define USE_SX1262
+    #elif defined(BRESSER_RADIO_LR1121)
+        #define USE_LR1121
+    #else
+        #error "No supported BRESSER_RADIO_* type selected"
+    #endif
+    #define PIN_RECEIVER_CS   LORA_CS
+    #define PIN_RECEIVER_IRQ  LORA_IRQ
+    #define PIN_RECEIVER_GPIO LORA_D1
+    #define PIN_RECEIVER_RST  LORA_RST
+
+#elif defined(ARDUINO_TTGO_LoRa32_V1)
     #pragma message("ARDUINO_TTGO_LoRa32_V1 defined; using on-board transceiver")
     #define USE_SX1276
     // Use pinning for LILIGO TTGO LoRa32-OLED
@@ -516,7 +542,14 @@
 //   Replacement for
 //   https://github.com/espressif/arduino-esp32/blob/master/cores/esp32/esp32-hal-log.h
 //   on ESP8266 and RP2040:
-#if defined(ESP8266) || defined(ARDUINO_ARCH_RP2040)
+#if defined(BRESSER_ESPHOME_IDF)
+    #define BRESSER_VENDOR_TAG "bresser_receiver"
+    #define log_e(...) ESP_LOGE(BRESSER_VENDOR_TAG, __VA_ARGS__)
+    #define log_w(...) ESP_LOGW(BRESSER_VENDOR_TAG, __VA_ARGS__)
+    #define log_i(...) ESP_LOGI(BRESSER_VENDOR_TAG, __VA_ARGS__)
+    #define log_d(...) ESP_LOGD(BRESSER_VENDOR_TAG, __VA_ARGS__)
+    #define log_v(...) ESP_LOGV(BRESSER_VENDOR_TAG, __VA_ARGS__)
+#elif defined(ESP8266) || defined(ARDUINO_ARCH_RP2040)
     #define ARDUHAL_LOG_LEVEL_NONE      0
     #define ARDUHAL_LOG_LEVEL_ERROR     1
     #define ARDUHAL_LOG_LEVEL_WARN      2

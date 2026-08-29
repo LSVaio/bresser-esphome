@@ -9,7 +9,7 @@ static const char *const TAG = "bresser_weather";
 void BresserWeatherComponent::setup() {
   ESP_LOGI(TAG, "Initialisiere Bresser-Empfaenger bei %.3f MHz",
            868.3f + this->frequency_offset_);
-  const int16_t state = this->receiver_.begin(1, true, this->frequency_offset_);
+  const int16_t state = this->receiver_.begin(this->max_sensors_, true, this->frequency_offset_);
   if (state != RADIOLIB_ERR_NONE) {
     ESP_LOGE(TAG, "Funkchip konnte nicht initialisiert werden (RadioLib-Fehler %d)", state);
     this->mark_failed();
@@ -21,6 +21,7 @@ void BresserWeatherComponent::setup() {
 void BresserWeatherComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "Bresser 868-MHz Wetterempfaenger:");
   ESP_LOGCONFIG(TAG, "  Empfangsfrequenz: %.3f MHz", 868.3f + this->frequency_offset_);
+  ESP_LOGCONFIG(TAG, "  Maximale Sensoren: %u", this->max_sensors_);
   if (this->filter_enabled_) {
     ESP_LOGCONFIG(TAG, "  Sensorfilter: %08" PRIX32, this->filter_sensor_id_);
   } else {

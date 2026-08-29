@@ -8,15 +8,15 @@ esphome:
   name_add_mac_suffix: true
   project:
     name: charlyschulte.bresser_el_nino
-    version: "1.1.0"
+    version: "1.2.0"
 
 # Voreinstellung fuer LILYGO TTGO LoRa32 V1.x (Platinenrevision V1.2)
 # mit SX1276.
 # Bei einer anderen Revision siehe README.md unter "Board-Revision".
 esp32:
-  board: ttgo-lora32-v1
+  variant: esp32
   framework:
-    type: arduino
+    type: esp-idf
 
 external_components:
   - source:
@@ -26,6 +26,11 @@ external_components:
 
 logger:
   level: DEBUG
+
+esp32_ble_tracker:
+
+bluetooth_proxy:
+  active: true
 
 api:
   encryption:
@@ -48,6 +53,7 @@ captive_portal:
 improv_serial:
 
 bresser_weather:
+  radio_type: sx1276
   # Pinbelegung des LILYGO TTGO LoRa32 V1.x / V1.2 mit SX1276.
   pins:
     sck: 5
@@ -56,7 +62,7 @@ bresser_weather:
     cs: 18
     reset: 14
     irq: 26
-    dio1: 33
+    gpio: 33
 
   # Zeigt beim Empfang z.B. "Empfangene Sensor-ID: 00003717" im ESPHome-Log.
   log_sensor_id: true

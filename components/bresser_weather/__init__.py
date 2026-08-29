@@ -24,6 +24,7 @@ from esphome.const import (
     UNIT_METER_PER_SECOND,
     UNIT_PERCENT,
 )
+from esphome.core import CORE
 
 DEPENDENCIES = ["esp32"]
 AUTO_LOAD = ["binary_sensor", "json", "sensor", "text_sensor"]
@@ -40,6 +41,12 @@ CONF_SENSOR_ID = "sensor_id"
 CONF_FILTER_SENSOR_ID = "filter_sensor_id"
 CONF_FREQUENCY_OFFSET = "frequency_offset"
 CONF_LOG_SENSOR_ID = "log_sensor_id"
+CONF_RADIO_TYPE = "radio_type"
+CONF_MAX_SENSORS = "max_sensors"
+CONF_SPI_HOST = "spi_host"
+CONF_SPI_CLOCK = "spi_clock"
+CONF_TCXO_VOLTAGE = "tcxo_voltage"
+CONF_DIO2_AS_RF_SWITCH = "dio2_as_rf_switch"
 CONF_PINS = "pins"
 CONF_SCK = "sck"
 CONF_MISO = "miso"
@@ -48,6 +55,19 @@ CONF_CS = "cs"
 CONF_RESET = "reset"
 CONF_IRQ = "irq"
 CONF_DIO1 = "dio1"
+CONF_GPIO = "gpio"
+
+RADIO_TYPES = {
+    "cc1101": "CC1101",
+    "sx1276": "SX1276",
+    "sx1262": "SX1262",
+    "lr1121": "LR1121",
+}
+
+SPI_HOSTS = {
+    "spi2": "SPI2_HOST",
+    "spi3": "SPI3_HOST",
+}
 
 UNIT_UV_INDEX = "UV index"
 UNIT_DECIBEL_MILLIWATT = "dBm"
@@ -57,22 +77,44 @@ BresserWeatherComponent = bresser_weather_ns.class_(
     "BresserWeatherComponent", cg.Component
 )
 
-PIN_SCHEMA = cv.Schema(
-    {
-        cv.Required(CONF_SCK): cv.int_range(min=0, max=33),
-        cv.Required(CONF_MISO): cv.int_range(min=0, max=39),
-        cv.Required(CONF_MOSI): cv.int_range(min=0, max=33),
-        cv.Required(CONF_CS): cv.int_range(min=0, max=33),
-        cv.Required(CONF_RESET): cv.int_range(min=0, max=33),
-        cv.Required(CONF_IRQ): cv.int_range(min=0, max=39),
-        cv.Required(CONF_DIO1): cv.int_range(min=0, max=39),
-    }
+def _validate_pins(config):
+    if CONF_DIO1 in config and CONF_GPIO in config:
+        raise cv.Invalid("Use either 'gpio' or the legacy name 'dio1', not both")
+    if CONF_DIO1 not in config and CONF_GPIO not in config:
+        raise cv.Invalid("One of 'gpio' or 'dio1' is required")
+    return config
+
+
+PIN_SCHEMA = cv.All(
+    cv.Schema(
+        {
+            cv.Required(CONF_SCK): cv.int_range(min=0, max=48),
+            cv.Required(CONF_MISO): cv.int_range(min=0, max=48),
+            cv.Required(CONF_MOSI): cv.int_range(min=0, max=48),
+            cv.Required(CONF_CS): cv.int_range(min=0, max=48),
+            cv.Optional(CONF_RESET): cv.int_range(min=0, max=48),
+            cv.Required(CONF_IRQ): cv.int_range(min=0, max=48),
+            cv.Optional(CONF_GPIO): cv.int_range(min=0, max=48),
+            cv.Optional(CONF_DIO1): cv.int_range(min=0, max=48),
+        }
+    ),
+    _validate_pins,
 )
 
 CONFIG_SCHEMA = cv.Schema(
     {
         cv.GenerateID(): cv.declare_id(BresserWeatherComponent),
         cv.Required(CONF_PINS): PIN_SCHEMA,
+        cv.Optional(CONF_RADIO_TYPE, default="sx1276"): cv.enum(
+            RADIO_TYPES, lower=True
+        ),
+        cv.Optional(CONF_MAX_SENSORS, default=4): cv.int_range(min=1, max=32),
+        cv.Optional(CONF_SPI_HOST, default="spi2"): cv.enum(SPI_HOSTS, lower=True),
+        cv.Optional(CONF_SPI_CLOCK, default=2000000): cv.int_range(
+            min=100000, max=10000000
+        ),
+        cv.Optional(CONF_TCXO_VOLTAGE): cv.float_range(min=0.0, max=3.3),
+        cv.Optional(CONF_DIO2_AS_RF_SWITCH, default=False): cv.boolean,
         cv.Optional(CONF_FILTER_SENSOR_ID): cv.hex_uint32_t,
         cv.Optional(CONF_LOG_SENSOR_ID, default=True): cv.boolean,
         cv.Optional(CONF_FREQUENCY_OFFSET, default=0.0): cv.float_range(
@@ -146,6 +188,7 @@ async def to_code(config):
     await cg.register_component(var, config)
 
     cg.add(var.set_frequency_offset(config[CONF_FREQUENCY_OFFSET]))
+    cg.add(var.set_max_sensors(config[CONF_MAX_SENSORS]))
     cg.add(var.set_log_sensor_id(config[CONF_LOG_SENSOR_ID]))
 
     if CONF_FILTER_SENSOR_ID in config:
@@ -186,23 +229,43 @@ async def to_code(config):
         "0.41.1",
         receiver_library.as_uri(),
     )
-    # ESPHome 2026 uses selective compilation for Arduino's bundled libraries.
-    cg.add_library("Preferences", None)
-    cg.add_library("SPI", None)
+    if CORE.using_arduino:
+        # ESPHome 2026 uses selective compilation for Arduino's bundled libraries.
+        cg.add_library("Preferences", None)
+        cg.add_library("SPI", None)
 
     # ESPHome's ESP-IDF based Arduino build intentionally uses the generic ESP32
     # variant, so PlatformIO's TTGO board macros/pins are not supplied. The
     # wiring is therefore defined explicitly in YAML and passed to the receiver.
     pins = config[CONF_PINS]
-    for flag in (
-        "-DARDUINO_TTGO_LoRa32_V1",
-        "-DLORA_SPI_BUS=HSPI",
+    gpio = pins.get(CONF_GPIO, pins.get(CONF_DIO1))
+    reset = pins.get(CONF_RESET, 0xFFFFFFFF)
+    radio_type = RADIO_TYPES[config[CONF_RADIO_TYPE]]
+    flags = [
+        "-DBRESSER_ESPHOME",
+        f"-DBRESSER_RADIO_{radio_type}",
         f"-DLORA_SCK={pins[CONF_SCK]}",
         f"-DLORA_MISO={pins[CONF_MISO]}",
         f"-DLORA_MOSI={pins[CONF_MOSI]}",
         f"-DLORA_CS={pins[CONF_CS]}",
-        f"-DLORA_RST={pins[CONF_RESET]}",
+        f"-DLORA_RST={reset}",
         f"-DLORA_IRQ={pins[CONF_IRQ]}",
-        f"-DLORA_D1={pins[CONF_DIO1]}",
-    ):
+        f"-DLORA_D1={gpio}",
+        f"-DBRESSER_SPI_CLOCK={config[CONF_SPI_CLOCK]}",
+    ]
+    if CORE.target_framework == "esp-idf":
+        flags.extend(
+            (
+                "-DBRESSER_ESPHOME_IDF",
+                f"-DBRESSER_SPI_HOST={SPI_HOSTS[config[CONF_SPI_HOST]]}",
+            )
+        )
+    else:
+        flags.append("-DLORA_SPI_BUS=HSPI")
+    if CONF_TCXO_VOLTAGE in config:
+        flags.append(f"-DBRESSER_TCXO_VOLTAGE={config[CONF_TCXO_VOLTAGE]}")
+    if config[CONF_DIO2_AS_RF_SWITCH]:
+        flags.append("-DBRESSER_DIO2_AS_RF_SWITCH")
+
+    for flag in flags:
         cg.add_build_flag(flag)
