@@ -1,0 +1,17 @@
+name: Validate ESPHome configuration
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install "esphome==2026.8.0"
+      - run: cp secrets.yaml.example secrets.yaml
+      - run: esphome config bresser-el-nino.yaml

@@ -1,0 +1,105 @@
+substitutions:
+  device_name: bresser-el-nino
+  friendly_name: Bresser El Nino
+
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+  name_add_mac_suffix: true
+  project:
+    name: charlyschulte.bresser_el_nino
+    version: "1.1.0"
+
+# Voreinstellung fuer LILYGO TTGO LoRa32 V1.x (Platinenrevision V1.2)
+# mit SX1276.
+# Bei einer anderen Revision siehe README.md unter "Board-Revision".
+esp32:
+  board: ttgo-lora32-v1
+  framework:
+    type: arduino
+
+external_components:
+  - source:
+      type: local
+      path: components
+    components: [bresser_weather]
+
+logger:
+  level: DEBUG
+
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+# Die Zugangsdaten werden beim ersten Start ueber den Einrichtungs-Hotspot
+# oder per USB/Improv eingegeben und dauerhaft auf dem ESP32 gespeichert.
+wifi:
+  ap:
+    ssid: "Bresser Wetter Setup"
+    password: !secret fallback_ap_password
+    ap_timeout: 15s
+
+captive_portal:
+
+improv_serial:
+
+bresser_weather:
+  # Pinbelegung des LILYGO TTGO LoRa32 V1.x / V1.2 mit SX1276.
+  pins:
+    sck: 5
+    miso: 19
+    mosi: 27
+    cs: 18
+    reset: 14
+    irq: 26
+    dio1: 33
+
+  # Zeigt beim Empfang z.B. "Empfangene Sensor-ID: 00003717" im ESPHome-Log.
+  log_sensor_id: true
+
+  # Optional: erst ohne Filter empfangen, ID im Log ablesen und danach
+  # die passende Zeile aktivieren.
+  # filter_sensor_id: 0x00003717
+
+  temperature:
+    name: Aussentemperatur
+  humidity:
+    name: Luftfeuchtigkeit
+  wind_gust:
+    name: Windboe
+  wind_speed:
+    name: Windgeschwindigkeit
+  wind_direction:
+    name: Windrichtung
+  rain:
+    name: Regenmenge gesamt
+  uv:
+    name: UV-Index
+  illuminance:
+    name: Beleuchtungsstaerke
+  rssi:
+    name: Funksignal Wetterstation
+  battery_low:
+    name: Batterie Wetterstation schwach
+  sensor_id:
+    name: Sensor-ID
+
+sensor:
+  - platform: wifi_signal
+    name: WLAN Signal
+    update_interval: 60s
+    entity_category: diagnostic
+
+  - platform: uptime
+    name: Laufzeit
+    update_interval: 60s
+    entity_category: diagnostic
+
+button:
+  - platform: restart
+    name: Neustart
+    entity_category: diagnostic
