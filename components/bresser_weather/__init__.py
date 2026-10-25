@@ -10,6 +10,7 @@ from esphome.const import (
     DEVICE_CLASS_BATTERY,
     DEVICE_CLASS_HUMIDITY,
     DEVICE_CLASS_ILLUMINANCE,
+    DEVICE_CLASS_MOISTURE,
     DEVICE_CLASS_PRECIPITATION,
     DEVICE_CLASS_SIGNAL_STRENGTH,
     DEVICE_CLASS_TEMPERATURE,
@@ -38,6 +39,8 @@ CONF_ILLUMINANCE = "illuminance"
 CONF_RSSI = "rssi"
 CONF_BATTERY_LOW = "battery_low"
 CONF_SENSOR_ID = "sensor_id"
+CONF_LEAKAGE_ALARM = "leakage_alarm"
+CONF_LEAKAGE_SENSOR_ID = "leakage_sensor_id"
 CONF_FILTER_SENSOR_ID = "filter_sensor_id"
 CONF_FREQUENCY_OFFSET = "frequency_offset"
 CONF_LOG_SENSOR_ID = "log_sensor_id"
@@ -116,6 +119,7 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_TCXO_VOLTAGE): cv.float_range(min=0.0, max=3.3),
         cv.Optional(CONF_DIO2_AS_RF_SWITCH, default=False): cv.boolean,
         cv.Optional(CONF_FILTER_SENSOR_ID): cv.hex_uint32_t,
+        cv.Optional(CONF_LEAKAGE_SENSOR_ID): cv.hex_uint32_t,
         cv.Optional(CONF_LOG_SENSOR_ID, default=True): cv.boolean,
         cv.Optional(CONF_FREQUENCY_OFFSET, default=0.0): cv.float_range(
             min=-1.0, max=1.0
@@ -179,6 +183,9 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_SENSOR_ID): text_sensor.text_sensor_schema(
             entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
         ),
+        cv.Optional(CONF_LEAKAGE_ALARM): binary_sensor.binary_sensor_schema(
+            device_class=DEVICE_CLASS_MOISTURE,
+        ),
     }
 ).extend(cv.COMPONENT_SCHEMA)
 
@@ -193,6 +200,8 @@ async def to_code(config):
 
     if CONF_FILTER_SENSOR_ID in config:
         cg.add(var.set_filter_sensor_id(config[CONF_FILTER_SENSOR_ID]))
+    if CONF_LEAKAGE_SENSOR_ID in config:
+        cg.add(var.set_leakage_sensor_id(config[CONF_LEAKAGE_SENSOR_ID]))
 
     sensor_setters = {
         CONF_TEMPERATURE: var.set_temperature_sensor,
@@ -213,6 +222,10 @@ async def to_code(config):
     if CONF_BATTERY_LOW in config:
         sens = await binary_sensor.new_binary_sensor(config[CONF_BATTERY_LOW])
         cg.add(var.set_battery_low_sensor(sens))
+
+    if CONF_LEAKAGE_ALARM in config:
+        sens = await binary_sensor.new_binary_sensor(config[CONF_LEAKAGE_ALARM])
+        cg.add(var.set_leakage_alarm_sensor(sens))
 
     if CONF_SENSOR_ID in config:
         sens = await text_sensor.new_text_sensor(config[CONF_SENSOR_ID])

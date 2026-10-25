@@ -27,7 +27,13 @@ void BresserWeatherComponent::dump_config() {
   } else {
     ESP_LOGCONFIG(TAG, "  Sensorfilter: aus");
   }
+  if (this->leakage_filter_enabled_) {
+    ESP_LOGCONFIG(TAG, "  Leckage-Sensorfilter: %08" PRIX32, this->leakage_sensor_id_);
+  } else {
+    ESP_LOGCONFIG(TAG, "  Leckage-Sensorfilter: aus");
+  }
   ESP_LOGCONFIG(TAG, "  Sensor-ID im Log: %s", YESNO(this->log_sensor_id_));
+  LOG_BINARY_SENSOR("  ", "Leckage-Alarm", this->leakage_alarm_sensor_);
   LOG_SENSOR("  ", "Temperatur", this->temperature_sensor_);
   LOG_SENSOR("  ", "Luftfeuchtigkeit", this->humidity_sensor_);
   LOG_SENSOR("  ", "Windboe", this->wind_gust_sensor_);
@@ -57,6 +63,17 @@ void BresserWeatherComponent::loop() {
     }
     if (this->log_sensor_id_) {
       ESP_LOGI(TAG, "Empfangene Sensor-ID: %08" PRIX32, data.sensor_id);
+    }
+    if (data.s_type == SENSOR_TYPE_LEAKAGE) {
+      // Wasserdetektor (7009975): eigener Filter, unabhaengig von filter_sensor_id.
+      if (this->leakage_filter_enabled_ && data.sensor_id != this->leakage_sensor_id_) {
+        ESP_LOGD(TAG, "Ignoriere Leckage-Sensor %08" PRIX32, data.sensor_id);
+        continue;
+      }
+      if (this->leakage_alarm_sensor_ != nullptr) {
+        this->leakage_alarm_sensor_->publish_state(data.leak.alarm);
+      }
+      continue;
     }
     if (this->filter_enabled_ && data.sensor_id != this->filter_sensor_id_) {
       ESP_LOGD(TAG, "Ignoriere Sensor %08" PRIX32, data.sensor_id);

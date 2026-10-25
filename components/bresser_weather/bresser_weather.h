@@ -24,6 +24,11 @@ class BresserWeatherComponent : public Component {
     filter_enabled_ = true;
   }
 
+  void set_leakage_sensor_id(uint32_t id) {
+    leakage_sensor_id_ = id;
+    leakage_filter_enabled_ = true;
+  }
+
   void set_temperature_sensor(sensor::Sensor *value) { temperature_sensor_ = value; }
   void set_humidity_sensor(sensor::Sensor *value) { humidity_sensor_ = value; }
   void set_wind_gust_sensor(sensor::Sensor *value) { wind_gust_sensor_ = value; }
@@ -35,6 +40,7 @@ class BresserWeatherComponent : public Component {
   void set_rssi_sensor(sensor::Sensor *value) { rssi_sensor_ = value; }
   void set_battery_low_sensor(binary_sensor::BinarySensor *value) { battery_low_sensor_ = value; }
   void set_sensor_id_text_sensor(text_sensor::TextSensor *value) { sensor_id_sensor_ = value; }
+  void set_leakage_alarm_sensor(binary_sensor::BinarySensor *value) { leakage_alarm_sensor_ = value; }
 
  protected:
   void publish_weather_(const WeatherSensor::sensor_t &data);
@@ -44,6 +50,8 @@ class BresserWeatherComponent : public Component {
   uint8_t max_sensors_{4};
   uint32_t filter_sensor_id_{0};
   bool filter_enabled_{false};
+  uint32_t leakage_sensor_id_{0};
+  bool leakage_filter_enabled_{false};
   bool log_sensor_id_{true};
 
   sensor::Sensor *temperature_sensor_{nullptr};
@@ -57,6 +65,7 @@ class BresserWeatherComponent : public Component {
   sensor::Sensor *rssi_sensor_{nullptr};
   binary_sensor::BinarySensor *battery_low_sensor_{nullptr};
   text_sensor::TextSensor *sensor_id_sensor_{nullptr};
+  binary_sensor::BinarySensor *leakage_alarm_sensor_{nullptr};
 };
 
 }  // namespace esphome::bresser_weather
